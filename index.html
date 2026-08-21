@@ -76,20 +76,32 @@
     z-index: 20;
     display: none;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     padding: 10px 16px;
     border: 0;
     border-radius: 999px;
-    background: #059669;
+    /* Sengaja BUKAN hijau: hijau (#059669) dipakai tombol "Masuk ke Sistem" */
+    background: #1d4ed8;
     color: #fff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     font-size: 13px;
     font-weight: 600;
-    box-shadow: 0 4px 14px rgba(5,150,105,.35);
+    box-shadow: 0 4px 14px rgba(29,78,216,.35);
     cursor: pointer;
+    box-sizing: border-box;
   }
   #install-btn.visible { display: flex; }
   #install-btn:active { transform: scale(0.97); }
+
+  /* Saat berhasil "menempel" tepat di bawah tombol "Masuk ke Sistem"
+     (posisi & lebar dikirim dari Auth.html via postMessage) */
+  #install-btn.anchored {
+    right: auto;
+    bottom: auto;
+    border-radius: 8px;
+    padding: 12px 16px;
+  }
 </style>
 </head>
 <body>
@@ -152,6 +164,52 @@
     installBtn.classList.remove('visible');
     deferredPrompt = null;
   });
+
+  // ------------------------------------------------------------
+  // Tempelkan tombol "Install App" di bawah tombol "Masuk ke
+  // Sistem" (yang dirender di dalam iframe oleh Auth.html),
+  // dengan lebar yang sama. Posisi & lebar tombol login dikirim
+  // dari dalam iframe lewat postMessage setiap kali berubah.
+  // ------------------------------------------------------------
+  var lastAnchorData = null;
+  var ANCHOR_GAP = 12; // jarak antara tombol login dan tombol install (px)
+
+  function applyAnchorPosition() {
+    if (!lastAnchorData || !lastAnchorData.visible || !lastAnchorData.rect) {
+      // Tombol "Masuk ke Sistem" sedang tidak terlihat
+      // (mis. sudah login) -> kembali ke posisi default.
+      installBtn.classList.remove('anchored');
+      installBtn.style.left = '';
+      installBtn.style.top = '';
+      installBtn.style.width = '';
+      return;
+    }
+
+    var frameRect = frame.getBoundingClientRect();
+    var cs = window.getComputedStyle(frame);
+    var padTop = parseFloat(cs.paddingTop) || 0;
+    var padLeft = parseFloat(cs.paddingLeft) || 0;
+
+    var rect = lastAnchorData.rect;
+    var left = frameRect.left + padLeft + rect.left;
+    var top = frameRect.top + padTop + rect.top + rect.height + ANCHOR_GAP;
+
+    installBtn.classList.add('anchored');
+    installBtn.style.left = left + 'px';
+    installBtn.style.top = top + 'px';
+    installBtn.style.width = rect.width + 'px';
+  }
+
+  window.addEventListener('message', function (e) {
+    var data = e.data;
+    if (!data || data.type !== 'onlinekan:install-anchor') return;
+    lastAnchorData = data;
+    applyAnchorPosition();
+  });
+
+  // Iframe full-viewport, tapi jaga-jaga jika orientasi/ukuran
+  // layar berubah, hitung ulang posisi dari data terakhir.
+  window.addEventListener('resize', applyAnchorPosition);
 </script>
 
 </body>
