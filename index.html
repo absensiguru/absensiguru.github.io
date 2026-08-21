@@ -158,20 +158,29 @@
   var promptAvailable = false;
   var authViewVisible = false;
   var lastRect = null;
+  var anchorMessageReceived = false; // true begitu Auth.html pernah kirim pesan
   var ANCHOR_GAP = 12; // jarak antara tombol login dan tombol install (px)
 
-  function refreshInstallButton() {
-    var shouldShow = promptAvailable && authViewVisible && lastRect;
+  function hideInstallButton() {
+    installBtn.classList.remove('visible');
+    installBtn.classList.remove('anchored');
+    installBtn.style.left = '';
+    installBtn.style.top = '';
+    installBtn.style.width = '';
+  }
 
-    if (!shouldShow) {
-      installBtn.classList.remove('visible');
-      installBtn.classList.remove('anchored');
-      installBtn.style.left = '';
-      installBtn.style.top = '';
-      installBtn.style.width = '';
-      return;
-    }
+  function showDefaultCorner() {
+    // Fallback pengaman: kalau pesan dari Auth.html belum/tidak
+    // pernah diterima (mis. karena hal lain di luar dugaan),
+    // tombol tetap tampil di pojok kanan-bawah, TIDAK hilang.
+    installBtn.classList.add('visible');
+    installBtn.classList.remove('anchored');
+    installBtn.style.left = '';
+    installBtn.style.top = '';
+    installBtn.style.width = '';
+  }
 
+  function showAnchoredBelowLogin() {
     var frameRect = frame.getBoundingClientRect();
     var cs = window.getComputedStyle(frame);
     var padTop = parseFloat(cs.paddingTop) || 0;
@@ -185,6 +194,26 @@
     installBtn.style.left = left + 'px';
     installBtn.style.top = top + 'px';
     installBtn.style.width = lastRect.width + 'px';
+  }
+
+  function refreshInstallButton() {
+    if (!promptAvailable) {
+      hideInstallButton();
+      return;
+    }
+
+    if (!anchorMessageReceived) {
+      showDefaultCorner();
+      return;
+    }
+
+    if (!authViewVisible || !lastRect) {
+      // Sudah login (layar "Masuk ke Sistem" tidak tampil) -> sembunyikan total.
+      hideInstallButton();
+      return;
+    }
+
+    showAnchoredBelowLogin();
   }
 
   window.addEventListener('beforeinstallprompt', function (e) {
@@ -211,10 +240,11 @@
   });
 
   // Terima posisi & status tampil dari tombol "Masuk ke Sistem"
-  // di dalam iframe (dikirim oleh Auth.html lewat postMessage).
+  // di dalam iframe (dikirim oleh Auth.html lewat window.top.postMessage).
   window.addEventListener('message', function (e) {
     var data = e.data;
     if (!data || data.type !== 'onlinekan:install-anchor') return;
+    anchorMessageReceived = true;
     authViewVisible = !!data.visible;
     lastRect = data.visible && data.rect ? data.rect : null;
     refreshInstallButton();
