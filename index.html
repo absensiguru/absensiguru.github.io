@@ -145,39 +145,26 @@
   var deferredPrompt = null;
   var installBtn = document.getElementById('install-btn');
 
-  window.addEventListener('beforeinstallprompt', function (e) {
-    e.preventDefault();
-    deferredPrompt = e;
-    installBtn.classList.add('visible');
-  });
-
-  installBtn.addEventListener('click', function () {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.finally(function () {
-      deferredPrompt = null;
-      installBtn.classList.remove('visible');
-    });
-  });
-
-  window.addEventListener('appinstalled', function () {
-    installBtn.classList.remove('visible');
-    deferredPrompt = null;
-  });
-
   // ------------------------------------------------------------
-  // Tempelkan tombol "Install App" di bawah tombol "Masuk ke
-  // Sistem" (yang dirender di dalam iframe oleh Auth.html),
-  // dengan lebar yang sama. Posisi & lebar tombol login dikirim
-  // dari dalam iframe lewat postMessage setiap kali berubah.
+  // Tombol install ditempelkan tepat di bawah tombol "Masuk ke
+  // Sistem" (yang dirender di dalam iframe oleh Auth.html).
+  // Tombol HANYA ditampilkan jika kedua syarat ini terpenuhi:
+  //   1) promptAvailable  -> browser menawarkan opsi install (PWA)
+  //   2) authViewVisible  -> layar login sedang tampil (belum login)
+  // Begitu user berhasil login (masuk ke dashboard), authViewVisible
+  // jadi false dan tombol otomatis disembunyikan total -- bukan
+  // cuma pindah ke pojok, supaya tidak "menggantung" di atas dashboard.
   // ------------------------------------------------------------
-  var lastAnchorData = null;
+  var promptAvailable = false;
+  var authViewVisible = false;
+  var lastRect = null;
   var ANCHOR_GAP = 12; // jarak antara tombol login dan tombol install (px)
 
-  function applyAnchorPosition() {
-    if (!lastAnchorData || !lastAnchorData.visible || !lastAnchorData.rect) {
-      // Tombol "Masuk ke Sistem" sedang tidak terlihat
-      // (mis. sudah login) -> kembali ke posisi default.
+  function refreshInstallButton() {
+    var shouldShow = promptAvailable && authViewVisible && lastRect;
+
+    if (!shouldShow) {
+      installBtn.classList.remove('visible');
       installBtn.classList.remove('anchored');
       installBtn.style.left = '';
       installBtn.style.top = '';
@@ -190,26 +177,52 @@
     var padTop = parseFloat(cs.paddingTop) || 0;
     var padLeft = parseFloat(cs.paddingLeft) || 0;
 
-    var rect = lastAnchorData.rect;
-    var left = frameRect.left + padLeft + rect.left;
-    var top = frameRect.top + padTop + rect.top + rect.height + ANCHOR_GAP;
+    var left = frameRect.left + padLeft + lastRect.left;
+    var top = frameRect.top + padTop + lastRect.top + lastRect.height + ANCHOR_GAP;
 
+    installBtn.classList.add('visible');
     installBtn.classList.add('anchored');
     installBtn.style.left = left + 'px';
     installBtn.style.top = top + 'px';
-    installBtn.style.width = rect.width + 'px';
+    installBtn.style.width = lastRect.width + 'px';
   }
 
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    promptAvailable = true;
+    refreshInstallButton();
+  });
+
+  installBtn.addEventListener('click', function () {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.finally(function () {
+      deferredPrompt = null;
+      promptAvailable = false;
+      refreshInstallButton();
+    });
+  });
+
+  window.addEventListener('appinstalled', function () {
+    deferredPrompt = null;
+    promptAvailable = false;
+    refreshInstallButton();
+  });
+
+  // Terima posisi & status tampil dari tombol "Masuk ke Sistem"
+  // di dalam iframe (dikirim oleh Auth.html lewat postMessage).
   window.addEventListener('message', function (e) {
     var data = e.data;
     if (!data || data.type !== 'onlinekan:install-anchor') return;
-    lastAnchorData = data;
-    applyAnchorPosition();
+    authViewVisible = !!data.visible;
+    lastRect = data.visible && data.rect ? data.rect : null;
+    refreshInstallButton();
   });
 
   // Iframe full-viewport, tapi jaga-jaga jika orientasi/ukuran
   // layar berubah, hitung ulang posisi dari data terakhir.
-  window.addEventListener('resize', applyAnchorPosition);
+  window.addEventListener('resize', refreshInstallButton);
 </script>
 
 </body>
