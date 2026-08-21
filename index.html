@@ -152,6 +152,15 @@
     installBtn.classList.remove('visible');
     deferredPrompt = null;
   });
+
+  // Tampilkan konfirmasi bawaan browser saat user mencoba menutup jendela
+  // (klik tombol ❌). Teks pesan TIDAK bisa dikustomisasi — ini batasan
+  // keamanan dari semua browser modern (Chrome/Edge/Firefox), supaya
+  // website tidak bisa menampilkan pesan popup sembarangan.
+  window.addEventListener('beforeunload', function (e) {
+    e.preventDefault();
+    e.returnValue = '';
+  });
 </script>
 
 </body>
